@@ -5,6 +5,8 @@ from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from app.schemas.document import DocumentResponse
 
+from app.workers.tasks import process_document_task
+
 router = APIRouter()
 
 
@@ -33,7 +35,8 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Could not save file: {str(e)}")
     
 
-    fake_task_id = "task_" + file_id
+    task = process_document_task.delay(file_path, file_id)
+    
 
 
     return DocumentResponse(
@@ -43,5 +46,5 @@ async def upload_document(
         size=os.path.getsize(file_path),
         upload_date=datetime.utcnow(),
         status="pending",
-        task_id=fake_task_id
+        task_id=task.id
     )
