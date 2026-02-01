@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-
+from app.api.v1.endpoints import documents, chat
 from app.api.v1.endpoints import documents
 
 @asynccontextmanager
@@ -23,7 +23,7 @@ app = FastAPI(
 
 
 app.include_router(documents.router, prefix="/api/v1", tags=["Documents"])
-
+app.include_router(chat.router, prefix="/api/v1", tags=["Chat"])
 
 
 app.add_middleware(
