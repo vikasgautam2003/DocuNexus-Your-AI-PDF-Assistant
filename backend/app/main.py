@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 
+from app.api.v1.endpoints import documents
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("🚀 DocuNexus API Starting up...")
@@ -19,6 +21,8 @@ app = FastAPI(
     
 )
 
+
+app.include_router(documents.router, prefix="/api/v1", tags=["Documents"])
 
 
 
