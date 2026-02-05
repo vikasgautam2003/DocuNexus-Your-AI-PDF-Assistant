@@ -12,6 +12,7 @@ from langgraph.graph import StateGraph, END
 
 class AgentState(TypedDict):
     question: str
+    file_id: str
     context: List[Document]
     answer: str
 
@@ -28,7 +29,7 @@ def retrieve(state: AgentState):
 
     print(f"🔍 [Agent] Retrieving context for: {state['question']}")
 
-    vector_store = get_vector_store()
+    vector_store = get_vector_store(namespace=state['file_id'])
     retriever = vector_store.as_retriever(search_kwargs={"k": 3})
     docs = retriever.invoke(state["question"])
     return {"context": docs}

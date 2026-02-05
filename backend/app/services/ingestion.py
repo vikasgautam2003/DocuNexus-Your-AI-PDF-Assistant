@@ -22,7 +22,7 @@ async def ingest_document(file_path: str, file_id: str):
             chunk.metadata["file_id"] = file_id
             chunk.metadata["source"] = os.path.basename(file_path)
 
-        vector_store = get_vector_store()
+        vector_store = get_vector_store(namespace=file_id)
         vector_store.add_documents(chunks)
 
         return {"status": "success", "chunks_count": len(chunks)}

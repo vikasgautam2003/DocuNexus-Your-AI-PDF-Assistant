@@ -8,6 +8,7 @@ router = APIRouter()
 
 class ChatRequest(BaseModel):
     query: str
+    file_id: str
 
 class ChatResponse(BaseModel):
     answer: str
@@ -17,7 +18,7 @@ class ChatResponse(BaseModel):
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     try: 
-        result = await rag_app.ainvoke({"question": request.query})
+        result = await rag_app.ainvoke({"question": request.query, "file_id": request.file_id})
         return ChatResponse(answer=result["answer"])
 
     except Exception as e:
