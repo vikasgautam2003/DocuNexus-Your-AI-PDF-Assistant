@@ -1,11 +1,16 @@
 import { useState } from "react";
 
+export type Citation = {
+  page: number;
+  text: string;
+};
+
 export type AgentStep = {
   id: number;
   type: "log" | "answer";
   content: string;
   status?: "pending" | "done";
-  citations?: number[];
+  citations?: Citation[];
 };
 
 export function useAgent() {

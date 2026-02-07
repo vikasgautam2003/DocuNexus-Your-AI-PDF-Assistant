@@ -1,3 +1,14 @@
+
+
+
+
+
+
+
+
+
+
+
 // "use client";
 
 // import { useState } from "react";
@@ -9,27 +20,27 @@
 // import { Send } from "lucide-react";
 // import dynamic from "next/dynamic";
 
-
 // const PDFViewer = dynamic(
 //   () => import("@/app/components/pdf-viewer").then((mod) => mod.PDFViewer),
-//   { 
+//   {
 //     ssr: false,
 //     loading: () => (
 //       <div className="flex h-full items-center justify-center text-slate-400">
 //         Loading PDF Engine...
 //       </div>
-//     )
+//     ),
 //   }
 // );
-
-
 
 // export default function Home() {
 //   const [fileId, setFileId] = useState<string | null>(null);
 //   const [query, setQuery] = useState("");
 //   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
-
 //   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+//   const [highlightText, setHighlightText] = useState<string | null>(null);
+
+//   const [currentPage, setCurrentPage] = useState<number>(1);
 
 //   const { steps, isThinking, chat } = useAgent();
 
@@ -43,7 +54,14 @@
 //   const handleUploadComplete = (id: string, file: File) => {
 //     setFileId(id);
 //     setPdfUrl(URL.createObjectURL(file));
-//   }
+//     setCurrentPage(1);
+
+//   };
+
+//   const handleCitationClick = (page: number, text: string) => {
+//     setCurrentPage(page);
+//     setHighlightText(text);
+//   };
 
 //   if (!fileId) {
 //     return (
@@ -55,14 +73,17 @@
 //     );
 //   }
 
-//   const lastAnswer = steps.filter(s => s.type === "answer").pop();
+//   const lastAnswer = steps.filter((s) => s.type === "answer").pop();
 
 //   return (
 //     <main className="flex min-h-screen bg-white">
 //       <div className="hidden lg:block w-1/2 border-r bg-slate-100 p-4">
-//         <div className="h-full flex items-center justify-center text-slate-400 border-2 border-dashed rounded-lg">
-//           <PDFViewer url={pdfUrl} />
-//         </div>
+//         <PDFViewer
+//           url={pdfUrl}
+//           pageNumber={currentPage}
+//           onPageChange={setCurrentPage}
+//           searchText={highlightText}
+//         />
 //       </div>
 
 //       <div className="flex-1 flex flex-col h-screen max-w-3xl mx-auto">
@@ -81,17 +102,35 @@
 //           />
 
 //           {lastAnswer && (
-//             <div className="flex gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-//               <div className="h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center text-white shrink-0">
-//                 AI
-//               </div>
-//               <div className="space-y-2">
-//                 <div className="prose prose-slate max-w-none">
-//                   <p>{lastAnswer.content}</p>
-//                 </div>
-//               </div>
-//             </div>
-//           )}
+//   <div className="flex gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+//     <div className="h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center text-white shrink-0">
+//       AI
+//     </div>
+//     <div className="space-y-2">
+//       <div className="prose prose-slate max-w-none">
+//         <p>{lastAnswer.content}</p>
+//       </div>
+
+
+//       {lastAnswer.citations && lastAnswer.citations.length > 0 && (
+//         <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-slate-100">
+//           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+//             Sources:
+//           </span>
+//           {lastAnswer.citations.map((page) => (
+//             <button
+//               key={ServerInsertedHTMLContext}
+//               onClick={() => handleCitationClick(citation.page, citation.text)}
+//               className="flex items-center gap-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2 py-1 rounded border border-indigo-200 transition-colors"
+//             >
+//               📄 Page {page}
+//             </button>
+//           ))}
+//         </div>
+//       )}
+//     </div>
+//   </div>
+// )}
 //         </div>
 
 //         <div className="p-4 border-t bg-white">
@@ -128,7 +167,8 @@
 "use client";
 
 import { useState } from "react";
-import { UploadZone } from "@/app/components/upload-zone";
+// Ensure these paths match where you actually created the files
+import { UploadZone } from "@/app/components/upload-zone"; 
 import { ReasoningDrawer } from "@/app/components/reasoning-drawer";
 import { useAgent } from "@/hooks/useAgent";
 import { Input } from "@/components/ui/input";
@@ -154,6 +194,8 @@ export default function Home() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
+  // Text highlighting state
+  const [highlightText, setHighlightText] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   const { steps, isThinking, chat } = useAgent();
@@ -165,14 +207,17 @@ export default function Home() {
     setIsDrawerOpen(true);
   };
 
+  // When upload is done, capture the file URL for preview
   const handleUploadComplete = (id: string, file: File) => {
     setFileId(id);
     setPdfUrl(URL.createObjectURL(file));
     setCurrentPage(1);
   };
 
-  const handleCitationClick = (page: number) => {
+  // Handle clicking a citation button
+  const handleCitationClick = (page: number, text: string) => {
     setCurrentPage(page);
+    setHighlightText(text); // Set the text to highlight
   };
 
   if (!fileId) {
@@ -185,18 +230,22 @@ export default function Home() {
     );
   }
 
+  // Get the last answer to display
   const lastAnswer = steps.filter((s) => s.type === "answer").pop();
 
   return (
     <main className="flex min-h-screen bg-white">
+      {/* LEFT PANEL: PDF VIEWER */}
       <div className="hidden lg:block w-1/2 border-r bg-slate-100 p-4">
         <PDFViewer
           url={pdfUrl}
           pageNumber={currentPage}
           onPageChange={setCurrentPage}
+          searchText={highlightText} // Pass highlight text
         />
       </div>
 
+      {/* RIGHT PANEL: CHAT */}
       <div className="flex-1 flex flex-col h-screen max-w-3xl mx-auto">
         <header className="p-4 border-b flex items-center justify-between">
           <h2 className="font-semibold">DocuNexus Chat</h2>
@@ -205,6 +254,7 @@ export default function Home() {
           </Button>
         </header>
 
+        {/* CHAT AREA */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           <ReasoningDrawer
             steps={steps}
@@ -213,37 +263,39 @@ export default function Home() {
           />
 
           {lastAnswer && (
-  <div className="flex gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-    <div className="h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center text-white shrink-0">
-      AI
-    </div>
-    <div className="space-y-2">
-      <div className="prose prose-slate max-w-none">
-        <p>{lastAnswer.content}</p>
-      </div>
+            <div className="flex gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center text-white shrink-0">
+                AI
+              </div>
+              <div className="space-y-2">
+                <div className="prose prose-slate max-w-none">
+                  <p>{lastAnswer.content}</p>
+                </div>
 
-      {/* [+] REAL CITATION BUTTONS */}
-      {lastAnswer.citations && lastAnswer.citations.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-slate-100">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Sources:
-          </span>
-          {lastAnswer.citations.map((page) => (
-            <button
-              key={page}
-              onClick={() => handleCitationClick(page)}
-              className="flex items-center gap-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2 py-1 rounded border border-indigo-200 transition-colors"
-            >
-              📄 Page {page}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  </div>
-)}
+                {/* CITATIONS SECTION */}
+                {lastAnswer.citations && lastAnswer.citations.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-slate-100">
+                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      Sources:
+                    </span>
+                    {/* FIXED MAPPING LOGIC HERE */}
+                    {lastAnswer.citations.map((citation, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleCitationClick(citation.page, citation.text)}
+                        className="flex items-center gap-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2 py-1 rounded border border-indigo-200 transition-colors"
+                      >
+                        📄 Page {citation.page}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* INPUT AREA */}
         <div className="p-4 border-t bg-white">
           <div className="flex gap-2">
             <Input

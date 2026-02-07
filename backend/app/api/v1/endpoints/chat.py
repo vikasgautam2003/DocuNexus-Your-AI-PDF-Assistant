@@ -46,6 +46,10 @@ from app.agents.rag import rag_app
 
 router = APIRouter()
 
+class Citation(BaseModel):
+    page: int
+    text: str
+
 
 class ChatRequest(BaseModel):
     query: str
@@ -54,7 +58,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
-    citations: List[int] = []
+    citations: List[Citation] = []
 
 
 @router.post("/chat", response_model=ChatResponse)
