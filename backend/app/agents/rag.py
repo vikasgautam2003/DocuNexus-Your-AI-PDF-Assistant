@@ -9,6 +9,9 @@ from langchain_core.output_parsers import StrOutputParser
 from app.core.vector_store import get_vector_store
 from langgraph.graph import StateGraph, END
 
+import asyncio
+
+
 from pydantic import BaseModel, Field
 from typing import List
 
@@ -29,15 +32,47 @@ llm = ChatGoogleGenerativeAI(
 )
 
 
-
 async def generate_document_briefing(file_id: str):
     print(f"📊 [Briefing] Generating summary for {file_id}...")
 
     vector_store = get_vector_store(namespace=file_id)
-    retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+    docs = []
+    
+    # [!] RETRY LOGIC: The API will wait for the Worker to finish
+    # It tries 5 times, waiting 2 seconds between each try (Total 10s wait)
+    for attempt in range(5):
+        try:
+            # 1. Ask Database: "Do you have data yet?"
+            # We use .get() to check raw data count
+            db_result = vector_store.get(limit=10)
+            
+            # 2. Check if documents exist
+            if db_result and db_result['documents'] and len(db_result['documents']) > 0:
+                print(f"✅ Found data on attempt {attempt+1}")
+                
+                # Convert raw text back to Document objects
+                docs = [
+                    Document(page_content=txt, metadata=meta) 
+                    for txt, meta in zip(db_result['documents'], db_result['metadatas'])
+                ]
+                break # Success! Stop waiting.
+            
+        except Exception as e:
+            print(f"⚠️ Attempt {attempt+1} check failed: {e}")
+        
+        # 3. If empty, WAIT 2 seconds and loop again
+        print(f"⏳ API waiting for Worker... (Attempt {attempt+1}/5)")
+        await asyncio.sleep(2)
 
-    docs = await retriever.ainvoke("introduction summary abstract overview")
+    # --- IF STILL EMPTY AFTER 10 SECONDS ---
+    if not docs:
+        print("❌ No documents found after retries. Worker is too slow or failed.")
+        return {
+            "summary": ["Processing is taking longer than expected."],
+            "suggested_questions": ["Please wait a moment and try asking a question."]
+        }
 
+    # --- GENERATE SUMMARY (If docs found) ---
     context_text = "\n\n".join([d.page_content for d in docs])[:4000]
 
     template = """You are a senior analyst. 
@@ -49,29 +84,25 @@ async def generate_document_briefing(file_id: str):
     Output strictly in JSON format with these fields:
     - "summary": A list of 3 concise bullet points summarizing the key themes.
     - "suggested_questions": A list of 3 specific, interesting questions a user might ask about this text.
-    
-    JSON:
     """
-
-    
-   
 
     class Briefing(BaseModel):
         summary: List[str] = Field(description="3 bullet points summary")
         suggested_questions: List[str] = Field(description="3 suggested follow-up questions")
 
+    # Use a standard model to be safe
+    # Ensure 'gemini-1.5-flash' is used if '2.5' fails
     structured_llm = llm.with_structured_output(Briefing)
 
     try:
         response = await structured_llm.ainvoke(template.format(context=context_text))
         return response.dict()
     except Exception as e:
-        print(f"⚠️ Briefing Error: {e}")
+        print(f"⚠️ Briefing LLM Error: {e}")
         return {
             "summary": ["Could not generate summary."],
             "suggested_questions": ["What is this document about?"]
         }
-
 
 
 
