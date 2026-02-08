@@ -22,6 +22,7 @@ class AgentState(TypedDict):
     file_id: str
     context: List[Document]
     answer: str
+    mode: str
     citations: List[dict]
 
 
@@ -37,34 +38,26 @@ async def generate_document_briefing(file_id: str):
 
     vector_store = get_vector_store(namespace=file_id)
     docs = []
-    
-    # [!] RETRY LOGIC: The API will wait for the Worker to finish
-    # It tries 5 times, waiting 2 seconds between each try (Total 10s wait)
+
     for attempt in range(5):
         try:
-            # 1. Ask Database: "Do you have data yet?"
-            # We use .get() to check raw data count
             db_result = vector_store.get(limit=10)
-            
-            # 2. Check if documents exist
+
             if db_result and db_result['documents'] and len(db_result['documents']) > 0:
                 print(f"✅ Found data on attempt {attempt+1}")
-                
-                # Convert raw text back to Document objects
+
                 docs = [
-                    Document(page_content=txt, metadata=meta) 
+                    Document(page_content=txt, metadata=meta)
                     for txt, meta in zip(db_result['documents'], db_result['metadatas'])
                 ]
-                break # Success! Stop waiting.
-            
+                break
+
         except Exception as e:
             print(f"⚠️ Attempt {attempt+1} check failed: {e}")
-        
-        # 3. If empty, WAIT 2 seconds and loop again
+
         print(f"⏳ API waiting for Worker... (Attempt {attempt+1}/5)")
         await asyncio.sleep(2)
 
-    # --- IF STILL EMPTY AFTER 10 SECONDS ---
     if not docs:
         print("❌ No documents found after retries. Worker is too slow or failed.")
         return {
@@ -72,7 +65,6 @@ async def generate_document_briefing(file_id: str):
             "suggested_questions": ["Please wait a moment and try asking a question."]
         }
 
-    # --- GENERATE SUMMARY (If docs found) ---
     context_text = "\n\n".join([d.page_content for d in docs])[:4000]
 
     template = """You are a senior analyst. 
@@ -90,8 +82,6 @@ async def generate_document_briefing(file_id: str):
         summary: List[str] = Field(description="3 bullet points summary")
         suggested_questions: List[str] = Field(description="3 suggested follow-up questions")
 
-    # Use a standard model to be safe
-    # Ensure 'gemini-1.5-flash' is used if '2.5' fails
     structured_llm = llm.with_structured_output(Briefing)
 
     try:
@@ -141,23 +131,46 @@ def generate(state: AgentState):
 
     unique_citations.sort(key=lambda x: x["page"])
 
-    template = """You are an expert teacher and technical assistant. 
-    Your goal is to answer the user's question clearly, accurately, and well-structured based *only* on the provided context.
+   
+    mode = state.get("mode", "standard")
 
-    structure your answer using Markdown formatting:
-    - Use **Bold** for key terms or important numbers.
-    - Use `## Headings` to separate different topics or sections.
-    - Use lists (- Item 1) for steps, features, or multiple points.
-    - If there is code, use code blocks.
-    - Be concise but thorough.
+    if mode == "nemesis":
+        template = """You are 'The Nemesis', a ruthless, hyper-critical auditor and devil's advocate.
+        
+        Your Goal: 
+        - Do NOT just answer the question. 
+        - Attack the premise. Find what is MISSING from the context.
+        - Highlight risks, logical fallacies, or vague language in the document.
+        - Use your own external knowledge to point out industry standards that are absent here.
+        - Be direct, skeptical, and slightly aggressive. Use 🔴 emojis for risks.
+        
+        Context from Document:
+        {context}
 
-    If the answer is not in the context, politely say you don't know.
+        User Question: {question}
+        
+        Analysis:
+        """
+    else:
 
-    Context:
-    {context}
 
-    Question: {question}
-    """
+        template = """You are an expert teacher and technical assistant. 
+        Your goal is to answer the user's question clearly, accurately, and well-structured based *only* on the provided context.
+
+        structure your answer using Markdown formatting:
+        - Use **Bold** for key terms or important numbers.
+        - Use `## Headings` to separate different topics or sections.
+        - Use lists (- Item 1) for steps, features, or multiple points.
+        - If there is code, use code blocks.
+        - Be concise but thorough.
+
+        If the answer is not in the context, politely say you don't know.
+
+        Context:
+        {context}
+
+        Question: {question}
+        """
 
     prompt = ChatPromptTemplate.from_template(template)
     chain = prompt | llm | StrOutputParser()

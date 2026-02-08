@@ -4,7 +4,7 @@
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 from app.agents.rag import rag_app
 from app.agents.rag import rag_app, generate_document_briefing
 
@@ -29,6 +29,7 @@ class BriefingResponse(BaseModel):
 class ChatRequest(BaseModel):
     query: str
     file_id: str
+    mode: Optional[str] = "standard"
 
 
 class ChatResponse(BaseModel):
@@ -36,12 +37,14 @@ class ChatResponse(BaseModel):
     citations: List[Citation] = []
 
 
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     try:
         result = await rag_app.ainvoke({
             "question": request.query,
-            "file_id": request.file_id
+            "file_id": request.file_id,
+            "mode": request.mode
         })
 
         return ChatResponse(

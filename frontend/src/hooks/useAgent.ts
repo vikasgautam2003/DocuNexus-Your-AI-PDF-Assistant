@@ -17,7 +17,7 @@ export function useAgent() {
   const [steps, setSteps] = useState<AgentStep[]>([]);
   const [isThinking, setIsThinking] = useState(false);
 
-  const chat = async (query: string, fileId: string) => {
+  const chat = async (query: string, fileId: string, mode: "standard" | "nemesis" = "standard") => {
     setIsThinking(true);
 
     setSteps([
@@ -28,7 +28,7 @@ export function useAgent() {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, file_id: fileId }),
+        body: JSON.stringify({ query, file_id: fileId, mode }),
       });
 
       const data = await response.json();
