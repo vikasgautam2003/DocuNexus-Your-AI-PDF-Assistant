@@ -225,13 +225,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Send, Bot, RotateCcw, Sparkles, Flame, ShieldAlert, Info } from "lucide-react";
+import { Send, Bot, RotateCcw, Sparkles, Flame, ShieldAlert, Info, BrainCircuit } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ReasoningDrawer } from "@/app/components/reasoning-drawer";
 import { useAgent } from "@/hooks/useAgent";
+
+import { FlashcardViewer } from "./flashcard-viewer";
+
 
 interface ChatInterfaceProps {
   fileId: string;
@@ -251,7 +254,40 @@ export function ChatInterface({ fileId, onChangePDF, onCitationClick }: ChatInte
   const [isLoadingBriefing, setIsLoadingBriefing] = useState(false);
   const [mode, setMode] = useState<"standard" | "nemesis">("standard");
 
+  const [flashcards, setFlashcards] = useState<any[]>([]);
+  const [isStudyMode, setIsStudyMode] = useState(false);
+  const [isLoadingCards, setIsLoadingCards] = useState(false);
+
   const { steps, isThinking, chat } = useAgent();
+
+
+  const handleStudyMode = async () => {
+    if (flashcards.length > 0) {
+        setIsStudyMode(true); // Already loaded? Just show it.
+        return;
+    }
+
+    setIsLoadingCards(true);
+    try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/flashcards`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: "flashcards", file_id: fileId }),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.cards && data.cards.length > 0) {
+                setFlashcards(data.cards);
+                setIsStudyMode(true);
+            }
+        }
+    } catch (e) {
+        console.error(e);
+    } finally {
+        setIsLoadingCards(false);
+    }
+  };
+
 
   useEffect(() => {
     if (!fileId) return;
@@ -294,14 +330,32 @@ export function ChatInterface({ fileId, onChangePDF, onCitationClick }: ChatInte
 
   return (
     <div className={`flex flex-col h-full shadow-2xl rounded-l-3xl border-l overflow-hidden transition-all duration-500 ${isNemesis ? "bg-slate-950 border-red-900/30" : "bg-white border-white/40"}`}>
-      
+      {isStudyMode && (
+          <FlashcardViewer 
+            cards={flashcards} 
+            onClose={() => setIsStudyMode(false)} 
+          />
+      )}
       <header className={`px-6 py-4 flex items-center justify-between z-20 backdrop-blur-xl border-b transition-colors duration-500 ${isNemesis ? "bg-slate-900/80 border-red-900/20" : "bg-white/80 border-slate-200/60"}`}>
+        <button
+                onClick={handleStudyMode}
+                disabled={isLoadingCards}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-300 ${
+                    isNemesis 
+                    ? "bg-slate-900 border-red-900/50 text-red-400 opacity-50 cursor-not-allowed" // Disable in Nemesis? Or keep it.
+                    : "bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100 hover:shadow-indigo-200/50"
+                }`}
+            >
+                {isLoadingCards ? <Sparkles className="h-4 w-4 animate-spin" /> : <BrainCircuit className="h-4 w-4" />}
+                <span className="text-xs font-medium hidden md:inline">Study</span>
+            </button>
         <div className="flex items-center gap-3">
           <div className={`h-2.5 w-2.5 rounded-full animate-pulse ${isNemesis ? "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]" : "bg-emerald-500"}`} />
           <h2 className={`font-semibold tracking-tight transition-colors duration-500 ${isNemesis ? "text-red-100" : "text-slate-800"}`}>
             DocuNexus {isNemesis ? <span className="text-red-500 font-bold">NEMESIS</span> : "Agent"}
           </h2>
         </div>
+
 
         <div className="flex items-center gap-3">
             <div className="relative group">

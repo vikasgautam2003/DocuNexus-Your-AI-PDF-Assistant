@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from app.agents.rag import rag_app
-from app.agents.rag import rag_app, generate_document_briefing
+from app.agents.rag import rag_app, generate_document_briefing, generate_flashcards
+
 
 
 
@@ -16,6 +17,7 @@ router = APIRouter()
 class Citation(BaseModel):
     page: int
     text: str
+
 
 
 class BriefingResponse(BaseModel):
@@ -35,6 +37,10 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     citations: List[Citation] = []
+
+
+class FlashcardResponse(BaseModel):
+    cards: List[dict]
 
 
 
@@ -58,8 +64,7 @@ async def chat_endpoint(request: ChatRequest):
 
 
 
-
-
+ 
 
 @router.post("/analyze", response_model=BriefingResponse)
 async def analyze_document(request: ChatRequest):
@@ -73,3 +78,17 @@ async def analyze_document(request: ChatRequest):
     except Exception as e:
         print(f"🔥 Error in analysis: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+
+@router.post("/flashcards", response_model=FlashcardResponse)
+async def get_flashcards(request: ChatRequest):
+    try:
+        result = await generate_flashcards(request.file_id)
+        return FlashcardResponse(cards=result.get("cards", []))
+    except Exception as e:
+        print(f"🔥 Flashcard Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+   

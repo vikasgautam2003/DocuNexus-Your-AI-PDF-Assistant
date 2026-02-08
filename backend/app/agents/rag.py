@@ -33,6 +33,61 @@ llm = ChatGoogleGenerativeAI(
 )
 
 
+class Flashcard(BaseModel):
+    front: str = Field(description="The question or concept (Front of card)")
+    back: str = Field(description="The answer or definition (Back of card)")
+
+
+class FlashcardSet(BaseModel):
+    cards: List[Flashcard]
+
+
+async def generate_flashcards(file_id: str):
+    print(f"🃏 [Flashcards] Generating study set for {file_id}...")
+    
+    vector_store = get_vector_store(namespace=file_id)
+
+    try:
+        db_result = vector_store.get(limit=15)
+        if db_result and db_result['documents']:
+            docs = [
+                Document(page_content=txt)
+                for txt in db_result['documents']
+            ]
+        else:
+            return {"cards": []}
+    except Exception as e:
+        print(f"⚠️ Flashcard Fetch Error: {e}")
+        return {"cards": []}
+
+    context_text = "\n\n".join([d.page_content for d in docs])[:6000]
+
+    template = """You are an expert tutor. 
+    Create a set of 8-10 high-quality flashcards to help a student learn this document.
+    
+    Focus on:
+    - Key definitions (What is X?)
+    - Important dates or figures.
+    - Core concepts and their explanations.
+    - Keep the "Front" short (under 15 words).
+    - Keep the "Back" clear and concise (under 40 words).
+    
+    Document Excerpt:
+    {context}
+    """
+    
+    structured_llm = llm.with_structured_output(FlashcardSet)
+    
+    try:
+        response = await structured_llm.ainvoke(template.format(context=context_text))
+        return response.dict()
+    except Exception as e:
+        print(f"⚠️ Flashcard LLM Error: {e}")
+        return {"cards": []}
+
+
+
+
 async def generate_document_briefing(file_id: str):
     print(f"📊 [Briefing] Generating summary for {file_id}...")
 
