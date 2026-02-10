@@ -22,8 +22,10 @@ export default function ServerWaker() {
         }
 
         if (workerUrl) {
-          pings.push(fetch(`${workerUrl}/`, { method: "HEAD" }));
-        }
+                // [!] ADD mode: "no-cors"
+                // This ignores the CORS error and successfully wakes the server
+                pings.push(fetch(`${workerUrl}/`, { method: "HEAD", mode: "no-cors" })); 
+            }
 
         await Promise.all(pings);
 
