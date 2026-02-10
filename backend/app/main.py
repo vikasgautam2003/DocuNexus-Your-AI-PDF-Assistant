@@ -37,5 +37,5 @@ app.add_middleware(
 
 
 @app.get("/health")
-async def health_check():
-    return {"status": "healthy", "service": "docunexus-api"}
+def health_check():
+    return {"status": "awake", "worker": "active"}
