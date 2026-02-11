@@ -1,9 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from app.agents.rag import process_document
+# from app.agents.rag import process_document
 import uuid
 import shutil
 import os
-from langchain_community.document_loaders import PyPDFLoader
+# from langchain_community.document_loaders import PyPDFLoader
 
 router = APIRouter()
 
@@ -16,6 +16,9 @@ async def upload_file(file: UploadFile = File(...)):
     temp_path = f"/tmp/{file_id}.pdf"
 
     try:
+        from app.agents.rag import process_document
+        from langchain_community.document_loaders import PyPDFLoader
+        
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
